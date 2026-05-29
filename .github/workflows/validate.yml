@@ -9,13 +9,18 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          # fetch-depth: 0 ensures the entire git history is available,
+          # allowing the validator to compare the PR against the main branch.
+          fetch-depth: 0 
 
       - name: Setup Node.js Environment
         uses: actions/setup-node@v4
-        # Removed invalid 'node-cache' input to clear the runner warning
+        with:
+          node-version: '20'
 
       - name: Install Linting Packages
-        run: npm install # Changed from 'npm ci' to fix the lockfile sync error
+        run: npm install
 
       - name: Run Core Code Validator
         run: npm run validate

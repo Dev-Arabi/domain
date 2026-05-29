@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: refs/pull/${{ github.event.pull_request.number }}/merge
-          fetch-depth: 2 
+          fetch-depth: 0 
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -85,10 +85,30 @@ jobs:
 
             // 🛡️ OWNERSHIP CHECK: ONLY applies to files that are being edited or deleted
             existingDomainsChanged.forEach(filePath => {
-              const fileName = path.basename(filePath);
-              const cleanName = fileName.replace('.json', '');
-              const parts = cleanName.split('.');
-              const fileOwner = parts[parts.length - 1].toLowerCase().trim();
+              let fileOwner = '';
+              
+              try {
+                const repo = process.env.GITHUB_REPOSITORY;
+                // Find the commit hash where this file was originally added
+                const firstCommit = execSync('git log --diff-filter=A --format=\"%H\" -n 1 -- \"' + filePath + '\"').toString().trim();
+                
+                if (firstCommit) {
+                  // Resolve the exact GitHub username who authorized that commit
+                  fileOwner = execSync('gh api /repos/' + repo + '/commits/' + firstCommit + ' --jq \".author.login\"').toString().trim();
+                }
+              } catch (gitErr) {
+                console.log('Git lookup failed for ' + filePath + ', falling back to filename parsing.');
+              }
+
+              // Fallback to legacy filename parsing if Git history lookup fails
+              if (!fileOwner || fileOwner === 'null') {
+                const fileName = path.basename(filePath);
+                const cleanName = fileName.replace('.json', '');
+                const parts = cleanName.split('.');
+                fileOwner = parts[parts.length - 1];
+              }
+
+              fileOwner = fileOwner.toLowerCase().trim();
 
               if (fileOwner !== actor.toLowerCase()) {
                 throw new Error('User ' + actor + ' is unauthorized to edit or delete records belonging to ' + fileOwner);
